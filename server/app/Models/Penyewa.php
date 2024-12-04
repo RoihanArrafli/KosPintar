@@ -2,18 +2,19 @@
 
 namespace App\Models;
 
+use Illuminate\Auth\Passwords\CanResetPassword;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Penyewa extends Model
 {
-    use HasApiTokens, HasFactory;
+    use HasApiTokens, HasFactory, CanResetPassword;
 
     protected $table = 'penyewa';
 
     protected $fillable = [
-        'nama_penyewa',
+        'name',
         'email',
         'password',
         'no_telp'

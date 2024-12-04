@@ -2,40 +2,99 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\Controller;
+use Illuminate\Support\Str;
+use App\Models\Pemilik;
+use App\Models\Penyewa;
+use App\Models\Admin;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Hash;
+use Laravel\Socialite\Facades\Socialite;
 use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
     public function register(Request $request) {
-        $validasi = Validator::make($request->all(), [
-            'type' => 'required|in:pemilik,penyewa',
-            'name' => 'required|string|max:150',
+        $input = Validator::make($request->all(), [
+            'role' => 'required|in:pemilik,penyewa',
+            'name' => 'required|string|max:255',
+            'no_telp' => 'required|max:15',
             'email' => 'required|email|unique:pemilik|unique:penyewa',
-            'password' => 'required|min:8',
-            'no_telp' => 'nullable|required'
+            'password' => 'required|string|min:8'
         ]);
+        
 
-        if ($validasi->fails()) {
+        if ($input->fails()) {
             return response()->json([
-                'message' => $validasi->errors()
-            ], 400);
+                'success' => false,
+                'message' => 'Terjadi Kesalan ' . $input->errors()
+            ], 200);
         }
 
-        $model = $request->type === 'pemilik' ? \App\Models\Pemilik::class : \App\Models\Penyewa::class;
+        $data = $request->only('name', 'no_telp', 'email', 'password');
+        $data['password'] = Hash::make($data['password']);
+        $user = NULL;
 
-        $user = $model::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' =>  password_hash($request->password, PASSWORD_BCRYPT),
-            'no_telp' => $request->no_telp
-        ]);
+        if ($request->role === 'pemilik') {
+            $user = Pemilik::create($data);
+        } elseif ($request->role === 'penyewa') {
+            $user = Penyewa::create($data);
+        }
 
         return response()->json([
-            'status' => true,
-            'message' => "Registrasi {$request->type} berhasil",
-            'data' => $user
+            'success' => true,
+            'message' => 'User berhasil registrasi!',
+            'data' => $user,
+            'role' => $request->role
         ], 200);
+    }
+
+    public function login(Request $request) {
+        $input = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'password' => 'required|string'
+        ]);
+
+        if ($input->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi Kesalahan ' . $input->errors()
+            ], 200);
+        }
+
+        $admin = Admin::where('email', $request->email)->first();
+        if ($admin && Hash::check($request->password, $admin->password)) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Login sukses!',
+                'data' => $admin,
+                'role' => 'admin'
+            ]);
+        }
+
+        $pemilik = Pemilik::where('email', $request->email)->first();
+        if ($pemilik && Hash::check($request->password, $pemilik->password)) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Login sukses!',
+                'data' => $pemilik,
+                'role' => 'pemilik'
+            ]);
+        }
+
+        $penyewa = Penyewa::where('email', $request->email)->first();
+        if ($penyewa && Hash::check($request->password, $penyewa->password)) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Login sukses!',
+                'data' => $penyewa,
+                'role' => 'penyewa'
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Invalid credentials'
+        ], 400);
     }
 }
